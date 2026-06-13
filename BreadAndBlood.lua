@@ -10,11 +10,11 @@ local defaultDB = {
         thirstRate = 1,
         fatigueRate = 1,
         effectThreshold = 15,
-        hideActionBars = true,
-        hideUnitFrames = true,
-        hideMinimap = true,
-        disableWorldMap = true,
-        fakeCombatErrors = true,
+        sourceActionBars = "hunger",
+        sourceUnitFrames = "hunger",
+        sourceMinimap = "thirst",
+        sourceWorldMap = "thirst",
+        sourceCombatError = "hunger",
         threshActionBars = 50,
         threshUnitFrames = 25,
         threshMinimap = 50,
@@ -31,26 +31,79 @@ local blinkTimer = 0
 local isBlinking = false
 local isSleeping = false
 
-local function IsEating()
+local scanTooltip = CreateFrame("GameTooltip", "BnBScanTooltip", nil, "GameTooltipTemplate")
+scanTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+local function CheckConsumables()
+    local isEating, eatIdx = false, nil
+    local isDrinking, drinkIdx = false, nil
+    
     for i=1, 40 do
         local name, _, icon = UnitAura("player", i)
         if not name then break end
-        if name:find("Food") or (icon and (icon:find("INV_Misc_Food") or icon:find("Spell_Misc_Food"))) then
-            return true
+        
+        if not isEating and (name:find("Food") or (icon and (icon:find("INV_Misc_Food") or icon:find("Spell_Misc_Food")))) then
+            isEating = true
+            eatIdx = i
         end
+        
+        if not isDrinking and (name:find("Drink") or (icon and icon:find("INV_Drink"))) then
+            isDrinking = true
+            drinkIdx = i
+        end
+        
+        if isEating and isDrinking then break end
     end
-    return false
+    
+    return isEating, eatIdx, isDrinking, drinkIdx
 end
 
-local function IsDrinking()
-    for i=1, 40 do
-        local name, _, icon = UnitAura("player", i)
-        if not name then break end
-        if name:find("Drink") or (icon and icon:find("INV_Drink")) then
-            return true
+local function GetAuraRestorePercent(auraIndex, isDrink)
+    scanTooltip:ClearLines()
+    scanTooltip:SetUnitAura("player", auraIndex)
+    
+    local amount = 0
+    for i = 1, 6 do
+        local leftLine = _G["BnBScanTooltipTextLeft" .. i]
+        if leftLine then
+            local text = leftLine:GetText()
+            if text then
+                local hm = text:match("(%d+) health and mana")
+                if hm then
+                    amount = tonumber(hm)
+                    break
+                end
+                
+                if isDrink then
+                    local m = text:match("(%d+) mana")
+                    if m then amount = tonumber(m); break end
+                else
+                    local h = text:match("(%d+) health")
+                    if h then amount = tonumber(h); break end
+                end
+            end
         end
     end
-    return false
+    
+    if amount == 0 then
+        return 25
+    end
+    
+    local maxStat = 1
+    if isDrink then
+        maxStat = UnitPowerMax("player", 0)
+        if maxStat == 0 then maxStat = UnitHealthMax("player") end
+    else
+        maxStat = UnitHealthMax("player")
+    end
+    if maxStat == 0 then maxStat = 1 end
+    
+    local pct = (amount / maxStat) * 100
+    local restoreAmount = pct * 6.5
+    if restoreAmount > 100 then restoreAmount = 100 end
+    if restoreAmount < 15 then restoreAmount = 15 end
+    
+    return math.floor(restoreAmount)
 end
 
 local function IsNearCampfire()
@@ -76,10 +129,12 @@ coreFrame:RegisterEvent("PLAYER_STARTED_MOVING")
 coreFrame:RegisterEvent("PLAYER_REGEN_DISABLED")
 coreFrame:RegisterEvent("CHAT_MSG_TEXT_EMOTE")
 
+local isForcedSit = false
+
 hooksecurefunc("DoEmote", function(emote)
     if type(emote) == "string" then
         emote = emote:upper()
-        if emote == "SLEEP" or emote == "SIT" then
+        if (emote == "SLEEP" or emote == "SIT") and not isForcedSit then
             isSleeping = true
         end
     end
@@ -92,8 +147,8 @@ if SlashCmdList["SIT"] then hooksecurefunc(SlashCmdList, "SIT", function() isSle
 -- VISUAL UI (DRAGGABLE BARS)
 -- =========================================
 local uiFrame = CreateFrame("Frame", "BreadAndBloodUIFrame", UIParent)
-uiFrame:SetWidth(150)
-uiFrame:SetHeight(56)
+uiFrame:SetWidth(164)
+uiFrame:SetHeight(68)
 uiFrame:SetPoint("CENTER", 0, 0)
 uiFrame:SetMovable(true)
 uiFrame:EnableMouse(true)
@@ -115,53 +170,79 @@ uiFrame:SetBackdrop({
 })
 uiFrame:SetBackdropColor(0, 0, 0, 0.7)
 
-local hungerBar = CreateFrame("StatusBar", nil, uiFrame)
-hungerBar:SetWidth(138)
-hungerBar:SetHeight(12)
-hungerBar:SetPoint("TOP", uiFrame, "TOP", 0, -6)
-hungerBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-hungerBar:SetStatusBarColor(0.8, 0.4, 0.1)
-hungerBar:SetMinMaxValues(0, 100)
-hungerBar:SetValue(100)
+local function CreateNicerBar(parent, yOffset, r, g, b, label)
+    local bar = CreateFrame("StatusBar", nil, parent)
+    bar:SetWidth(148)
+    bar:SetHeight(14)
+    bar:SetPoint("TOP", parent, "TOP", 0, yOffset)
+    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar:SetStatusBarColor(r, g, b)
+    bar:SetMinMaxValues(0, 100)
+    bar:SetValue(100)
+    
+    local bg = bar:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(true)
+    bg:SetTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bg:SetVertexColor(r * 0.3, g * 0.3, b * 0.3, 0.8)
+    
+    local border = CreateFrame("Frame", nil, bar)
+    border:SetPoint("TOPLEFT", -2, 2)
+    border:SetPoint("BOTTOMRIGHT", 2, -2)
+    border:SetBackdrop({
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 8, edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    border:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
-local hungerText = hungerBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-hungerText:SetPoint("CENTER", hungerBar, "CENTER", 0, 0)
-hungerText:SetText("Hunger: 100%")
+    local text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    text:SetPoint("CENTER", bar, "CENTER", 0, 0)
+    text:SetText(label .. ": 100%")
+    text:SetShadowOffset(1, -1)
+    text:SetShadowColor(0, 0, 0, 1)
+    
+    return bar, text
+end
 
-local thirstBar = CreateFrame("StatusBar", nil, uiFrame)
-thirstBar:SetWidth(138)
-thirstBar:SetHeight(12)
-thirstBar:SetPoint("TOP", hungerBar, "BOTTOM", 0, -4)
-thirstBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-thirstBar:SetStatusBarColor(0.1, 0.5, 0.9)
-thirstBar:SetMinMaxValues(0, 100)
-thirstBar:SetValue(100)
+local hungerBar, hungerText = CreateNicerBar(uiFrame, -8, 0.8, 0.3, 0.1, "Hunger")
+local thirstBar, thirstText = CreateNicerBar(uiFrame, -28, 0.1, 0.5, 0.9, "Thirst")
+local fatigueBar, fatigueText = CreateNicerBar(uiFrame, -48, 0.7, 0.7, 0.2, "Fatigue")
 
-local thirstText = thirstBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-thirstText:SetPoint("CENTER", thirstBar, "CENTER", 0, 0)
-thirstText:SetText("Thirst: 100%")
-
-local fatigueBar = CreateFrame("StatusBar", nil, uiFrame)
-fatigueBar:SetWidth(138)
-fatigueBar:SetHeight(12)
-fatigueBar:SetPoint("TOP", thirstBar, "BOTTOM", 0, -4)
-fatigueBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-fatigueBar:SetStatusBarColor(0.8, 0.8, 0.2)
-fatigueBar:SetMinMaxValues(0, 100)
-fatigueBar:SetValue(100)
-
-local fatigueText = fatigueBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-fatigueText:SetPoint("CENTER", fatigueBar, "CENTER", 0, 0)
-fatigueText:SetText("Fatigue: 100%")
-
-local blinkFrame = CreateFrame("Frame", "BreadAndBloodBlinkFrame", UIParent)
-blinkFrame:SetAllPoints()
+local blinkFrame = CreateFrame("Frame", "BreadAndBloodBlinkFrame", WorldFrame)
+blinkFrame:SetAllPoints(WorldFrame)
 blinkFrame:SetFrameStrata("TOOLTIP")
 blinkFrame:SetAlpha(0)
 blinkFrame:Hide()
 local blinkTexture = blinkFrame:CreateTexture(nil, "BACKGROUND")
-blinkTexture:SetAllPoints()
+blinkTexture:SetAllPoints(blinkFrame)
 blinkTexture:SetTexture(0, 0, 0, 1)
+
+local hungerWarningIcon = CreateFrame("Frame", "BnBHungerWarning", UIParent)
+hungerWarningIcon:SetSize(64, 64)
+hungerWarningIcon:SetPoint("CENTER", -80, 150)
+hungerWarningIcon:SetAlpha(0)
+hungerWarningIcon:Hide()
+local hwTexture = hungerWarningIcon:CreateTexture(nil, "ARTWORK")
+hwTexture:SetAllPoints()
+hwTexture:SetTexture("Interface\\Icons\\INV_Misc_Food_15")
+
+local thirstWarningIcon = CreateFrame("Frame", "BnBThirstWarning", UIParent)
+thirstWarningIcon:SetSize(64, 64)
+thirstWarningIcon:SetPoint("CENTER", 0, 150)
+thirstWarningIcon:SetAlpha(0)
+thirstWarningIcon:Hide()
+local twTexture = thirstWarningIcon:CreateTexture(nil, "ARTWORK")
+twTexture:SetAllPoints()
+twTexture:SetTexture("Interface\\Icons\\INV_Drink_08")
+
+local fatigueWarningIcon = CreateFrame("Frame", "BnBFatigueWarning", UIParent)
+fatigueWarningIcon:SetSize(64, 64)
+fatigueWarningIcon:SetPoint("CENTER", 80, 150)
+fatigueWarningIcon:SetAlpha(0)
+fatigueWarningIcon:Hide()
+local fwTexture = fatigueWarningIcon:CreateTexture(nil, "ARTWORK")
+fwTexture:SetAllPoints()
+fwTexture:SetTexture("Interface\\Icons\\Spell_Nature_Sleep")
 
 local function UpdateUIBars()
     if not BreadAndBloodDB then return end
@@ -183,27 +264,55 @@ optionsPanel.name = "BreadAndBlood"
 
 local title = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 title:SetPoint("TOPLEFT", 16, -16)
-title:SetText("Bread and Blood Settings")
+title:SetText("Bread & Blood Settings")
 
-local function CreateCheckButton(name, parent, labelText, dbKey, yOffset, xOffset)
-    local cb = CreateFrame("CheckButton", name, parent, "InterfaceOptionsCheckButtonTemplate")
-    cb:SetPoint("TOPLEFT", xOffset or 16, yOffset)
-    _G[cb:GetName() .. "Text"]:SetText(labelText)
-    cb:SetScript("OnShow", function(self)
+local sourceOptions = {"hunger", "thirst", "fatigue", "none"}
+local sourceLabels = {hunger = "Hunger", thirst = "Thirst", fatigue = "Fatigue", none = "Disabled"}
+
+local function CreateCycleButton(name, parent, labelText, dbKey, yOffset, xOffset, tooltipText)
+    local btn = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
+    btn:SetPoint("TOPLEFT", xOffset or 16, yOffset)
+    btn:SetSize(100, 22)
+    
+    local label = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    label:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 2)
+    label:SetText(labelText)
+    
+    btn:SetScript("OnShow", function(self)
         if BreadAndBloodDB and BreadAndBloodDB.config then
-            self:SetChecked(BreadAndBloodDB.config[dbKey])
+            local val = BreadAndBloodDB.config[dbKey] or "none"
+            self:SetText(sourceLabels[val])
         end
     end)
-    cb:SetScript("OnClick", function(self)
+    btn:SetScript("OnClick", function(self)
         if BreadAndBloodDB and BreadAndBloodDB.config then
-            BreadAndBloodDB.config[dbKey] = self:GetChecked() and true or false
+            local currentVal = BreadAndBloodDB.config[dbKey] or "none"
+            local nextIdx = 1
+            for i, v in ipairs(sourceOptions) do
+                if v == currentVal then nextIdx = i + 1 break end
+            end
+            if nextIdx > #sourceOptions then nextIdx = 1 end
+            local newVal = sourceOptions[nextIdx]
+            BreadAndBloodDB.config[dbKey] = newVal
+            self:SetText(sourceLabels[newVal])
             ApplyPenalties()
         end
     end)
-    return cb
+    if tooltipText then
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(labelText, 1, 1, 1)
+            GameTooltip:AddLine(tooltipText, nil, nil, nil, true)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+        end)
+    end
+    return btn
 end
 
-local function CreateSlider(name, parent, labelText, dbKey, minVal, maxVal, yOffset, xOffset)
+local function CreateSlider(name, parent, labelText, dbKey, minVal, maxVal, yOffset, xOffset, tooltipText)
     local slider = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", xOffset or 16, yOffset)
     slider:SetMinMaxValues(minVal, maxVal)
@@ -226,32 +335,43 @@ local function CreateSlider(name, parent, labelText, dbKey, minVal, maxVal, yOff
         end
         _G[self:GetName() .. "Text"]:SetText(labelText .. ": " .. val)
     end)
+    if tooltipText then
+        slider:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(labelText, 1, 1, 1)
+            GameTooltip:AddLine(tooltipText, nil, nil, nil, true)
+            GameTooltip:Show()
+        end)
+        slider:SetScript("OnLeave", function(self)
+            GameTooltip:Hide()
+        end)
+    end
     return slider
 end
 
 -- Penalties Checkboxes (Left Column)
-local cb1 = CreateCheckButton("BnBOptCB1", optionsPanel, "Hide Action Bars", "hideActionBars", -60, 16)
-local cb2 = CreateCheckButton("BnBOptCB2", optionsPanel, "Hide Unit Frames", "hideUnitFrames", -110, 16)
-local cb3 = CreateCheckButton("BnBOptCB3", optionsPanel, "Hide Minimap", "hideMinimap", -160, 16)
-local cb4 = CreateCheckButton("BnBOptCB4", optionsPanel, "Disable World Map", "disableWorldMap", -210, 16)
-local cb5 = CreateCheckButton("BnBOptCB5", optionsPanel, "Fake Combat Errors", "fakeCombatErrors", -260, 16)
+local cb1 = CreateCycleButton("BnBOptCB1", optionsPanel, "Action Bars", "sourceActionBars", -50, 16, "Select which stat controls the fading of your action bars.")
+local cb2 = CreateCycleButton("BnBOptCB2", optionsPanel, "Unit Frames", "sourceUnitFrames", -95, 16, "Select which stat controls the fading of player and target frames.")
+local cb3 = CreateCycleButton("BnBOptCB3", optionsPanel, "Minimap", "sourceMinimap", -140, 16, "Select which stat controls the fading of the minimap.")
+local cb4 = CreateCycleButton("BnBOptCB4", optionsPanel, "World Map", "sourceWorldMap", -185, 16, "Select which stat prevents you from opening the world map.")
+local cb5 = CreateCycleButton("BnBOptCB5", optionsPanel, "Combat Errors", "sourceCombatError", -230, 16, "Select which stat causes random spellcasting failures (fizzles).")
 
 -- Thresholds Sliders (Right Column)
-local s5 = CreateSlider("BnBOptS5", optionsPanel, "Threshold (%)", "threshActionBars", 5, 90, -65, 250)
-local s6 = CreateSlider("BnBOptS6", optionsPanel, "Threshold (%)", "threshUnitFrames", 5, 90, -115, 250)
-local s7 = CreateSlider("BnBOptS7", optionsPanel, "Threshold (%)", "threshMinimap", 5, 90, -165, 250)
-local s8 = CreateSlider("BnBOptS8", optionsPanel, "Threshold (%)", "threshWorldMap", 5, 90, -215, 250)
-local s9 = CreateSlider("BnBOptS9", optionsPanel, "Threshold (%)", "threshCombatError", 5, 90, -265, 250)
+local s5 = CreateSlider("BnBOptS5", optionsPanel, "Threshold (%)", "threshActionBars", 5, 90, -55, 250, "If the stat falls below this %, your action bars will completely fade out.")
+local s6 = CreateSlider("BnBOptS6", optionsPanel, "Threshold (%)", "threshUnitFrames", 5, 90, -100, 250, "If the stat falls below this %, your unit frames will completely fade out.")
+local s7 = CreateSlider("BnBOptS7", optionsPanel, "Threshold (%)", "threshMinimap", 5, 90, -145, 250, "If the stat falls below this %, your minimap will completely fade out.")
+local s8 = CreateSlider("BnBOptS8", optionsPanel, "Threshold (%)", "threshWorldMap", 5, 90, -190, 250, "If the stat falls below this %, opening the world map will fail.")
+local s9 = CreateSlider("BnBOptS9", optionsPanel, "Threshold (%)", "threshCombatError", 5, 90, -235, 250, "If the stat falls below this %, your spells have a chance to fizzle.")
 
 -- Global Rates (Bottom Rows)
 local rateTitle = optionsPanel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-rateTitle:SetPoint("TOPLEFT", 16, -310)
+rateTitle:SetPoint("TOPLEFT", 16, -280)
 rateTitle:SetText("Global Drop Rates & Effects")
 
-local s1 = CreateSlider("BnBOptS1", optionsPanel, "Hunger Rate (/min)", "hungerRate", 1, 10, -340, 16)
-local s2 = CreateSlider("BnBOptS2", optionsPanel, "Thirst Rate (/min)", "thirstRate", 1, 10, -340, 180)
-local s3 = CreateSlider("BnBOptS3", optionsPanel, "Fatigue Rate (/min)", "fatigueRate", 1, 10, -340, 340)
-local s4 = CreateSlider("BnBOptS4", optionsPanel, "Global Effect Threshold", "effectThreshold", 5, 50, -390, 16)
+local s1 = CreateSlider("BnBOptS1", optionsPanel, "Hunger Rate (/min)", "hungerRate", 1, 10, -310, 16, "How much hunger is lost per minute.")
+local s2 = CreateSlider("BnBOptS2", optionsPanel, "Thirst Rate (/min)", "thirstRate", 1, 10, -310, 200, "How much thirst is lost per minute.")
+local s3 = CreateSlider("BnBOptS3", optionsPanel, "Fatigue Rate (/min)", "fatigueRate", 1, 10, -360, 16, "How much fatigue is lost per minute when not resting.")
+local s4 = CreateSlider("BnBOptS4", optionsPanel, "Global Effect Threshold", "effectThreshold", 5, 50, -360, 200, "At what % the character starts groaning, seeing red vignettes, or blinking.")
 
 InterfaceOptions_AddCategory(optionsPanel)
 
@@ -259,19 +379,34 @@ InterfaceOptions_AddCategory(optionsPanel)
 -- LOGIC
 -- =========================================
 
+local function GetStatValue(sourceStr)
+    if sourceStr == "hunger" then return BreadAndBloodDB.hunger end
+    if sourceStr == "thirst" then return BreadAndBloodDB.thirst end
+    if sourceStr == "fatigue" then return BreadAndBloodDB.fatigue end
+    return 100
+end
+
+local function CalculateAlpha(statValue, threshold)
+    local fadeStart = threshold + 25
+    if statValue >= fadeStart then return 1.0 end
+    if statValue <= threshold then return 0.0 end
+    return (statValue - threshold) / 25.0
+end
+
 function ApplyPenalties()
     if not BreadAndBloodDB or not BreadAndBloodDB.config then return end
-    local h = BreadAndBloodDB.hunger
-    local t = BreadAndBloodDB.thirst
 
     UpdateUIBars()
 
-    if BreadAndBloodDB.config.hideActionBars and h <= BreadAndBloodDB.config.threshActionBars then
-        MainMenuBar:SetAlpha(0.1)
-        MultiBarBottomLeft:SetAlpha(0.1)
-        MultiBarBottomRight:SetAlpha(0.1)
-        MultiBarRight:SetAlpha(0.1)
-        MultiBarLeft:SetAlpha(0.1)
+    local abSource = BreadAndBloodDB.config.sourceActionBars or "none"
+    if abSource ~= "none" then
+        local val = GetStatValue(abSource)
+        local a = CalculateAlpha(val, BreadAndBloodDB.config.threshActionBars)
+        MainMenuBar:SetAlpha(a)
+        MultiBarBottomLeft:SetAlpha(a)
+        MultiBarBottomRight:SetAlpha(a)
+        MultiBarRight:SetAlpha(a)
+        MultiBarLeft:SetAlpha(a)
     else
         MainMenuBar:SetAlpha(1.0)
         MultiBarBottomLeft:SetAlpha(1.0)
@@ -280,38 +415,52 @@ function ApplyPenalties()
         MultiBarLeft:SetAlpha(1.0)
     end
 
-    if BreadAndBloodDB.config.hideUnitFrames and h <= BreadAndBloodDB.config.threshUnitFrames then
-        PlayerFrame:SetAlpha(0)
-        TargetFrame:SetAlpha(0)
+    local ufSource = BreadAndBloodDB.config.sourceUnitFrames or "none"
+    if ufSource ~= "none" then
+        local val = GetStatValue(ufSource)
+        local a = CalculateAlpha(val, BreadAndBloodDB.config.threshUnitFrames)
+        PlayerFrame:SetAlpha(a)
+        TargetFrame:SetAlpha(a)
     else
         PlayerFrame:SetAlpha(1.0)
         TargetFrame:SetAlpha(1.0)
     end
 
-    if h <= 10 then
+    if BreadAndBloodDB.hunger <= 10 then
         ChatFrame1:SetAlpha(0)
     else
         ChatFrame1:SetAlpha(1.0)
     end
 
-    if BreadAndBloodDB.config.hideMinimap and t <= BreadAndBloodDB.config.threshMinimap then
-        MinimapCluster:SetAlpha(0)
+    local mmSource = BreadAndBloodDB.config.sourceMinimap or "none"
+    if mmSource ~= "none" then
+        local val = GetStatValue(mmSource)
+        local a = CalculateAlpha(val, BreadAndBloodDB.config.threshMinimap)
+        MinimapCluster:SetAlpha(a)
     else
         MinimapCluster:SetAlpha(1.0)
     end
     
-    if BreadAndBloodDB.config.disableWorldMap and t <= BreadAndBloodDB.config.threshWorldMap then
-        if WorldMapFrame:IsVisible() then
+    local wmSource = BreadAndBloodDB.config.sourceWorldMap or "none"
+    if wmSource ~= "none" then
+        local val = GetStatValue(wmSource)
+        if val <= BreadAndBloodDB.config.threshWorldMap and WorldMapFrame:IsVisible() then
             HideUIPanel(WorldMapFrame)
-            UIErrorsFrame:AddMessage("You are too dehydrated to focus on the map!", 1.0, 0.1, 0.1, 1.0)
+            UIErrorsFrame:AddMessage("You are too exhausted to focus on the map!", 1.0, 0.1, 0.1, 1.0)
         end
     end
 end
 
 WorldMapFrame:HookScript("OnShow", function(self)
-    if BreadAndBloodDB and BreadAndBloodDB.config and BreadAndBloodDB.config.disableWorldMap and BreadAndBloodDB.thirst <= BreadAndBloodDB.config.threshWorldMap then
-        HideUIPanel(WorldMapFrame)
-        UIErrorsFrame:AddMessage("You are too dehydrated to focus on the map!", 1.0, 0.1, 0.1, 1.0)
+    if BreadAndBloodDB and BreadAndBloodDB.config then
+        local wmSource = BreadAndBloodDB.config.sourceWorldMap or "none"
+        if wmSource ~= "none" then
+            local val = GetStatValue(wmSource)
+            if val <= BreadAndBloodDB.config.threshWorldMap then
+                HideUIPanel(WorldMapFrame)
+                UIErrorsFrame:AddMessage("You are too exhausted to focus on the map!", 1.0, 0.1, 0.1, 1.0)
+            end
+        end
     end
 end)
 
@@ -323,11 +472,35 @@ coreFrame:SetScript("OnEvent", function(self, event, ...)
         local addonName = ...
         if addonName == "BreadAndBlood" then
             if not BreadAndBloodDB then BreadAndBloodDB = defaultDB end
+            -- Validate config
             if not BreadAndBloodDB.config then BreadAndBloodDB.config = defaultDB.config end
+            -- Inject missing thresholds if updating from older version
             for k, v in pairs(defaultDB.config) do
                 if BreadAndBloodDB.config[k] == nil then
                     BreadAndBloodDB.config[k] = v
                 end
+            end
+            
+            -- Migrate old boolean config to new string config
+            if BreadAndBloodDB.config.hideActionBars ~= nil then
+                BreadAndBloodDB.config.sourceActionBars = BreadAndBloodDB.config.hideActionBars and "hunger" or "none"
+                BreadAndBloodDB.config.hideActionBars = nil
+            end
+            if BreadAndBloodDB.config.hideUnitFrames ~= nil then
+                BreadAndBloodDB.config.sourceUnitFrames = BreadAndBloodDB.config.hideUnitFrames and "hunger" or "none"
+                BreadAndBloodDB.config.hideUnitFrames = nil
+            end
+            if BreadAndBloodDB.config.hideMinimap ~= nil then
+                BreadAndBloodDB.config.sourceMinimap = BreadAndBloodDB.config.hideMinimap and "thirst" or "none"
+                BreadAndBloodDB.config.hideMinimap = nil
+            end
+            if BreadAndBloodDB.config.disableWorldMap ~= nil then
+                BreadAndBloodDB.config.sourceWorldMap = BreadAndBloodDB.config.disableWorldMap and "thirst" or "none"
+                BreadAndBloodDB.config.disableWorldMap = nil
+            end
+            if BreadAndBloodDB.config.fakeCombatErrors ~= nil then
+                BreadAndBloodDB.config.sourceCombatError = BreadAndBloodDB.config.fakeCombatErrors and "hunger" or "none"
+                BreadAndBloodDB.config.fakeCombatErrors = nil
             end
             
             if not BreadAndBloodDB.hunger then BreadAndBloodDB.hunger = 100 end
@@ -347,16 +520,20 @@ coreFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "CHAT_MSG_TEXT_EMOTE" then
         local msg = ...
         local lmsg = msg:lower()
-        if lmsg:find("sleep") or lmsg:find("sit") or lmsg:find("uyku") or lmsg:find("otur") then
+        if lmsg:find("sleep") or lmsg:find("sit") then
             isSleeping = true
         end
     elseif event == "UNIT_SPELLCAST_SENT" then
         local unit = ...
-        if unit == "player" and BreadAndBloodDB and BreadAndBloodDB.config and BreadAndBloodDB.config.fakeCombatErrors then
-            if BreadAndBloodDB.hunger <= BreadAndBloodDB.config.threshCombatError then
-                if math.random(1, 100) <= 30 then
-                    UIErrorsFrame:AddMessage("Your hands are shaking from starvation...", 1.0, 0.1, 0.1, 1.0)
-                    PlaySound("SPELL_FAILED_FIZZLE")
+        if unit == "player" and BreadAndBloodDB and BreadAndBloodDB.config then
+            local ceSource = BreadAndBloodDB.config.sourceCombatError or "none"
+            if ceSource ~= "none" then
+                local val = GetStatValue(ceSource)
+                if val <= BreadAndBloodDB.config.threshCombatError then
+                    if math.random(1, 100) <= 30 then
+                        UIErrorsFrame:AddMessage("Your hands are shaking...", 1.0, 0.1, 0.1, 1.0)
+                        PlaySound("SPELL_FAILED_FIZZLE")
+                    end
                 end
             end
         end
@@ -365,19 +542,20 @@ coreFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "UNIT_AURA" then
         local unit = ...
         if unit == "player" then
-            local eating = IsEating()
-            local drinking = IsDrinking()
+            local eating, eatIdx, drinking, drinkIdx = CheckConsumables()
             
             if eating and not isEatingNow then
-                BreadAndBloodDB.hunger = math.min(100, BreadAndBloodDB.hunger + 25)
-                print("|cff00ff00[Bread & Blood]|r You ate some food. Hunger: " .. BreadAndBloodDB.hunger .. "%")
+                local amount = GetAuraRestorePercent(eatIdx, false)
+                BreadAndBloodDB.hunger = math.min(100, BreadAndBloodDB.hunger + amount)
+                print("|cff00ff00[Bread & Blood]|r You ate some food (Quality: +" .. amount .. "%). Hunger: " .. BreadAndBloodDB.hunger .. "%")
                 ApplyPenalties()
             end
             isEatingNow = eating
             
             if drinking and not isDrinkingNow then
-                BreadAndBloodDB.thirst = math.min(100, BreadAndBloodDB.thirst + 25)
-                print("|cff00ff00[Bread & Blood]|r You drank something. Thirst: " .. BreadAndBloodDB.thirst .. "%")
+                local amount = GetAuraRestorePercent(drinkIdx, true)
+                BreadAndBloodDB.thirst = math.min(100, BreadAndBloodDB.thirst + amount)
+                print("|cff00ff00[Bread & Blood]|r You drank something (Quality: +" .. amount .. "%). Thirst: " .. BreadAndBloodDB.thirst .. "%")
                 ApplyPenalties()
             end
             isDrinkingNow = drinking
@@ -387,6 +565,32 @@ end)
 
 coreFrame:SetScript("OnUpdate", function(self, elapsed)
     if not BreadAndBloodDB or not BreadAndBloodDB.config then return end
+    
+    -- Warning Icons Logic
+    local thresh = BreadAndBloodDB.config.effectThreshold
+    local timeSec = GetTime()
+    local pulseAlpha = 0.5 + 0.5 * math.sin(timeSec * 4) 
+
+    if BreadAndBloodDB.hunger <= (thresh + 5) then
+        hungerWarningIcon:Show()
+        hungerWarningIcon:SetAlpha(pulseAlpha)
+    else
+        hungerWarningIcon:Hide()
+    end
+
+    if BreadAndBloodDB.thirst <= (thresh + 5) then
+        thirstWarningIcon:Show()
+        thirstWarningIcon:SetAlpha(pulseAlpha)
+    else
+        thirstWarningIcon:Hide()
+    end
+
+    if BreadAndBloodDB.fatigue <= (thresh + 5) then
+        fatigueWarningIcon:Show()
+        fatigueWarningIcon:SetAlpha(pulseAlpha)
+    else
+        fatigueWarningIcon:Hide()
+    end
     
     if isBlinking then
         blinkTimer = blinkTimer - elapsed
@@ -402,8 +606,44 @@ coreFrame:SetScript("OnUpdate", function(self, elapsed)
         effectTimer = 0
         local thresh = BreadAndBloodDB.config.effectThreshold
         
-        if BreadAndBloodDB.hunger <= thresh or BreadAndBloodDB.thirst <= thresh or BreadAndBloodDB.fatigue <= thresh then
-            PlaySound("Heartbeat")
+        if BreadAndBloodDB.hunger <= thresh then
+            local roll = math.random(1, 100)
+            if roll <= 20 then
+                PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\hunger.wav")
+                DoEmote("GROAN")
+                UIErrorsFrame:AddMessage("Your stomach growls loudly...", 1.0, 0.5, 0.0, 1.0)
+            elseif roll <= 35 then
+                PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\hunger.wav")
+                UIErrorsFrame:AddMessage("You are starving!", 1.0, 0.5, 0.0, 1.0)
+            end
+        end
+
+        if BreadAndBloodDB.thirst <= thresh then
+            if math.random(1, 100) <= 20 then
+                PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\thirst.wav")
+                UIErrorsFrame:AddMessage("You are extremely thirsty!", 1.0, 0.5, 0.0, 1.0)
+            end
+        end
+        
+        if BreadAndBloodDB.fatigue <= 0 then
+            if not InCombatLockdown() and not isSleeping then
+                PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\fatigue.wav")
+                isForcedSit = true
+                DoEmote("SIT")
+                isForcedSit = false
+                UIErrorsFrame:AddMessage("You collapse from exhaustion!", 1.0, 0.0, 0.0, 1.0)
+            end
+        elseif BreadAndBloodDB.fatigue <= 10 then
+            if not InCombatLockdown() and not isSleeping then
+                if math.random(1, 100) <= 15 then
+                    PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\fatigue.wav")
+                    DoEmote("YAWN")
+                    isForcedSit = true
+                    DoEmote("SIT")
+                    isForcedSit = false
+                    UIErrorsFrame:AddMessage("You are too exhausted to stand...", 1.0, 0.0, 0.0, 1.0)
+                end
+            end
         end
         
         if BreadAndBloodDB.hunger <= (thresh + 5) then
@@ -419,14 +659,21 @@ coreFrame:SetScript("OnUpdate", function(self, elapsed)
         
         if BreadAndBloodDB.fatigue <= (thresh + 10) then
             if not isBlinking and math.random(1, 100) <= 20 then
+                PlaySoundFile("Interface\\AddOns\\BreadAndBlood\\Sounds\\fatigue.wav")
                 isBlinking = true
                 blinkTimer = 1.0
                 blinkFrame:Show()
                 blinkFrame:SetAlpha(1)
+                UIErrorsFrame:AddMessage("Your eyes are starting to close from exhaustion...", 1.0, 0.5, 0.0, 1.0)
             end
         end
         
-        if IsResting() or IsNearCampfire() or isSleeping then
+        if IsResting() then
+            if BreadAndBloodDB.fatigue < 100 then
+                BreadAndBloodDB.fatigue = math.min(100, BreadAndBloodDB.fatigue + 10)
+                UpdateUIBars()
+            end
+        elseif IsNearCampfire() or isSleeping then
             if BreadAndBloodDB.fatigue < 100 then
                 BreadAndBloodDB.fatigue = math.min(100, BreadAndBloodDB.fatigue + 5)
                 UpdateUIBars()
@@ -458,8 +705,11 @@ coreFrame:SetScript("OnUpdate", function(self, elapsed)
         ApplyPenalties()
     end
     
-    if BreadAndBloodDB.config.disableWorldMap and BreadAndBloodDB.thirst <= BreadAndBloodDB.config.threshWorldMap and WorldMapFrame:IsVisible() then
-        HideUIPanel(WorldMapFrame)
+    if BreadAndBloodDB.config.sourceWorldMap and BreadAndBloodDB.config.sourceWorldMap ~= "none" then
+        local val = GetStatValue(BreadAndBloodDB.config.sourceWorldMap)
+        if val <= BreadAndBloodDB.config.threshWorldMap and WorldMapFrame:IsVisible() then
+            HideUIPanel(WorldMapFrame)
+        end
     end
 end)
 

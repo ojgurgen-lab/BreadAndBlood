@@ -1,5 +1,5 @@
 ## Interface: 30300
-## Title: Bread and Blood
+## Title: Bread & Blood
 ## Notes: Hardcore survival mechanics: Hunger, Thirst, Fatigue, and hallucinations.
 ## Author: Antigravity
 ## Version: 1.1
