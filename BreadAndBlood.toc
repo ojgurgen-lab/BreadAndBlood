@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: Bread and Blood
+## Notes: Hardcore survival mechanics: Hunger, Thirst, Fatigue, and hallucinations.
+## Author: Antigravity
+## Version: 1.1
+## SavedVariablesPerCharacter: BreadAndBloodDB
+
+BreadAndBlood.lua
