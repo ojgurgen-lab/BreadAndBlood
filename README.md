@@ -11,6 +11,8 @@
 Designed for roleplayers, hardcore players, and those looking for an extra layer of immersion in WotLK (3.3.5a).
 
  <img width="692" height="562" alt="Ekran görüntüsü 2026-06-13 152021" src="https://github.com/user-attachments/assets/bf61f6e6-d3de-46a9-8a3b-7d2ec9181e7b" />
+
+---
 (i will update the overlay for sliders, i know it is bad looking right now :D )
 ---
 
