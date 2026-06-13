@@ -1,100 +1,27 @@
-\# Bread \& Blood (WoW 3.3.5a Survival Addon)
-
-
-
-\*\*Bread \& Blood\*\* is a fully client-side survival addon developed specifically for the Wrath of the Lich King (3.3.5a) emulators. Inspired by concepts like \*Wanderlust Azeroth Survival\*, this addon turns World of Warcraft into an immersive survival experience tailored for Hardcore players and Roleplayers.
-
-
-
-Instead of punishing your character through arbitrary stat penalties, \*\*Bread \& Blood\*\* attacks your UI, perception, and senses. As your character struggles, the game itself starts pushing back, creating genuine tension and immersion.
-
-
-
-\---
-
-
-
-\## Core Survival Mechanics
-
-
-
-\* \*\*Survival Vitals:\*\* Adds fully functional tracking bars for \*\*Hunger\*\*, \*\*Thirst\*\*, and \*\*Fatigue\*\* that gradually drain over time.
-
-\* \*\*Sustenance:\*\* Eating food restores Hunger, while drinking liquids restores Thirst.
-
-\* \*\*Resting \& Recovery:\*\* Fatigue can be recovered by resting inside Inns/Cities, using the `/sleep` emote, or simply spending time sitting next to a Cozy Campfire.
-
-
-
-\---
-
-
-
-\##  Immersive UI Penalties \& Hallucinations
-
-
-
-As your vitals drop into dangerous thresholds, your character starts losing their grip on reality, leading to severe UI and environmental penalties:
-
-
-
-\* \*\*Starvation (Low Hunger):\*\* Your combat instincts fade. Action bars will gradually blur or completely disappear from your screen, making it harder to track your cooldowns and abilities.
-
-\* \*\*Dehydration (Low Thirst):\*\* Severe dehydration causes disorientation. Your World Map becomes entirely unavailable as your character loses their sense of direction.
-
-\* \*\*Exhaustion (Low Fatigue):\*\* Trying to cast spells or perform actions while exhausted triggers fake spell failures, phantom cooldowns, and stressful warning messages.
-
-\* \*\*The Breaking Point:\*\* When any vital reaches critical condition, heavy heartbeat sound effects echo, and low-health visual filters take over your screen, forcing you to feel the panic.
-
-
-
-\---
-
-
-
-\## Fully Customizable Options
-
-
-
-The addon features a comprehensive, built-in settings menu allowing you to tailor the survival experience exactly to your playstyle:
-
-
-
-\* \*\*Adjustable Drain Rates:\*\* Speed up or slow down how fast Hunger, Thirst, and Fatigue decay based on your preferred difficulty.
-
-\* \*\*Penalty Thresholds:\*\* Define exactly at what percentages the UI disruptions, map loss, and visual/audio effects start kicking in.
-
-\* \*\*Toggleable Features:\*\* Don't like a specific penalty? You can completely turn off individual hallucinations or UI fades to match your comfort zone.
-
-
-
-\---
-
-
-
-\## Installation
-
-
-
-1\. Go to the \*\*Releases\*\* section on the right side of this GitHub page.
-
-2\. Download the latest \*\*`BreadAndBlood.zip`\*\* file.
-
-3\. Extract the ZIP file and place the `BreadAndBlood` folder directly into your WoW directory:  
-
-&#x20;  `World of Warcraft\\Interface\\AddOns\\`
-
-4\. Log into the game, and make sure the addon is enabled in the \*\*AddOns\*\* list at the character selection screen.
-
-
-
-\---
-
-
-
-\## Roadmap \& Community Ideas
-
-
-
-This project is actively being developed! If you are a fellow hardcore addict or RP enjoyer and have ideas for immersive survival mechanics, unique UI penalties, or visual quirks, feel free to open an Issue or leave feedback.
-
+Bring true survival to Azeroth.
+
+Bread & Blood completely transforms your World of Warcraft experience by introducing hardcore survival mechanics: Hunger, Thirst, and Fatigue. No longer is eating and drinking just for restoring health and mana; it is now essential for your sheer survival. Neglect your basic needs, and your character will suffer severe immersive penalties, from debilitating hallucinations to losing focus in combat.
+
+Designed for roleplayers, hardcore players, and those looking for an extra layer of immersion in WotLK (3.3.5a).
+
+ Core Mechanics
+ Hunger: Decreases over time. Keep your belly full by eating any in-game food. Starving will cause your hands to shake, leading to sudden spellcasting failures in combat.
+Thirst: Drops over time. Stay hydrated by drinking. Severe dehydration will make you lose focus, preventing you from reading your World Map.
+Fatigue: You will grow tired as you travel. Restore your energy by sitting, sleeping (/sleep or /sit), staying near a Cozy Fire / Campfire, or staying in a rested area (Inn/City).
+Immersive Penalties (Dynamic UI)
+As your survival meters deplete, the world around you becomes more hostile. The lower your stats, the more your character struggles:
+
+Vision Loss: Exhaustion and hunger will cause you to slowly lose your UI elements. Your Action Bars, Unit Frames, and Minimap will fade away as you weaken.
+Hallucinations & Blinking: Extreme fatigue will cause your screen to blink, simulating your character struggling to keep their eyes open.
+Heartbeats & Red Vignette: When reaching critically low levels on any of your needs, you will hear loud heartbeats and see the edges of your vision turn red.
+Combat Fizzles: Starvation induces hand tremors, creating fake combat errors and spell fizzles when you try to cast abilities.
+Fully Customizable Interface
+Bread & Blood comes with a sleek, draggable UI widget to track your needs. Everything is highly customizable via the built-in Interface Options:
+
+Adjust the decay rates for Hunger, Thirst, and Fatigue to fit your desired difficulty.
+Set specific percentage thresholds for when penalties (like hiding action bars or map disabling) kick in.
+Toggle any specific penalty on or off. Don't like the fake spell fizzles? Simply turn them off.
+⌨️ Slash Commands
+/bnb - Gives you quick information and help.
+/bnb test [hunger] [thirst] [fatigue] - Quickly test penalties by setting your values (e.g., /bnb test 20 20 20).
+(Note: Go to ESC -> Interface -> AddOns -> BreadAndBlood to access the full settings panel.)
