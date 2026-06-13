@@ -1,62 +1,50 @@
 <p align="center">
-
+  <img src="Media/logo.png" alt="Bread & Blood Logo" width="600">
 </p>
 
-# Bread & Blood (WoW 3.3.5a Survival Addon)
+# Bread & Blood - Survival Immersion for WoW 3.3.5a
 
-**Bring true survival to Azeroth.**
-
-**Bread & Blood** completely transforms your World of Warcraft experience by introducing hardcore survival mechanics: **Hunger**, **Thirst**, and **Fatigue**. No longer is eating and drinking just for restoring health and mana; it is now essential for your sheer survival. Neglect your basic needs, and your character will suffer severe immersive penalties, from debilitating hallucinations to losing focus in combat.
-
-Designed for roleplayers, hardcore players, and those looking for an extra layer of immersion in WotLK (3.3.5a).
-
- <img width="692" height="562" alt="Ekran görüntüsü 2026-06-13 152021" src="https://github.com/user-attachments/assets/bf61f6e6-d3de-46a9-8a3b-7d2ec9181e7b" />
-
----
-(i will update the overlay for sliders, i know it is bad looking right now :D )
----
-
-## Core Mechanics
-
-* **Hunger:** Decreases over time. Keep your belly full by eating any in-game food. Starving will cause your hands to shake, leading to sudden spellcasting failures in combat.
-* **Thirst:** Drops over time. Stay hydrated by drinking. Severe dehydration will make you lose focus, preventing you from reading your World Map.
-* **Fatigue:** You will grow tired as you travel. Restore your energy by sitting, sleeping (`/sleep` or `/sit`), staying near a Cozy Fire / Campfire, or staying in a rested area (Inn/City).
-
-<img width="170" height="70" alt="Ekran görüntüsü 2026-06-13 152041" src="https://github.com/user-attachments/assets/897a625a-901d-4bfb-b4fb-60346b682881" />
+**Bread & Blood** transforms your World of Warcraft experience into a true survival adventure. Designed for roleplayers and hardcore players alike, this addon introduces three core needs your character must manage: **Hunger**, **Thirst**, and **Fatigue**. Neglecting these needs will result in severe interface and gameplay penalties, forcing you to think like a true adventurer.
 
 ---
 
-## Immersive Penalties (Dynamic UI)
+## Core Survival Mechanics
 
-As your survival meters deplete, the world around you becomes more hostile. The lower your stats, the more your character struggles:
-
-* **Vision Loss:** Exhaustion and hunger will cause you to slowly lose your UI elements. Your Action Bars, Unit Frames, and Minimap will fade away as you weaken.
-* **Hallucinations & Blinking:** Extreme fatigue will cause your screen to blink, simulating your character struggling to keep their eyes open.
-* **Heartbeats & Red Vignette:** When reaching critically low levels on any of your needs, you will hear loud heartbeats and see the edges of your vision turn red.
-* **Combat Fizzles:** Starvation induces hand tremors, creating fake combat errors and spell fizzles when you try to cast abilities.
+* **Hunger:** Slowly depletes over time. Eating food restores your hunger level based on the quality of the meal.
+* **Thirst:** Slowly depletes over time. Drinking beverages restores your thirst level.
+* **Fatigue:** Depletes as you adventure. You can recover fatigue by resting at an Inn, sitting by a cozy campfire, or using the `/sleep` or `/sit` emotes.
 
 ---
 
-## Fully Customizable Interface
+## Immersive Interface & Penalties
 
-Bread & Blood comes with a sleek, draggable UI widget to track your needs. Everything is highly customizable via the built-in Interface Options:
+As your survival stats drop below critical thresholds, your character will begin to suffer. Bread & Blood dynamically alters your user interface to reflect your deteriorating physical state:
 
-* Adjust the decay rates for Hunger, Thirst, and Fatigue to fit your desired difficulty.
-* Set specific percentage thresholds for when penalties (like hiding action bars or map disabling) kick in.
-* Toggle any specific penalty on or off. Don't like the fake spell fizzles? Simply turn them off.
+* **Fading Senses:** Your Action Bars, Player/Target Unit Frames, and Minimap will begin to fade out as your condition worsens.
+* **Exhaustion:** If you are too tired or thirsty, you may lose the ability to focus on the World Map. If fatigue reaches zero, your character will collapse and be forced to sit down.
+* **Combat Inefficiency:** Starvation or extreme fatigue can cause your hands to shake, giving your spells a random chance to fizzle and fail in the heat of battle.
+* **Audio & Visual Cues:** Experience custom sound effects like stomach growls and yawns, screen vignettes, and a blinking effect when your eyes start closing from exhaustion. On-screen warning indicators will pulse when your stats are critically low.
 
 ---
 
-## Slash Commands
+## Fully Customizable Settings
+
+The addon includes a comprehensive options menu (accessible via `ESC -> Interface -> AddOns` or the `/bnb` command), allowing you to tailor the survival experience to your exact preferences:
+
+* **Penalty Assignments:** Choose exactly which stat (Hunger, Thirst, Fatigue, or Disabled) triggers each UI penalty (Action Bars, Unit Frames, Minimap, World Map, Combat Errors).
+* **Custom Thresholds:** Fine-tune the exact percentage at which each penalty begins to take effect.
+* **Adjustable Rates:** Control the difficulty by changing the exact rate at which Hunger, Thirst, and Fatigue deplete every minute.
+
+---
+
+## Commands
 
 You can use the following commands in-game to manage or test the addon:
 
 | Command | Description |
 | :--- | :--- |
-| `/bnb` | Gives you quick information and help. |
-| `/bnb test [hunger] [thirst] [fatigue]` | Quickly test penalties by setting custom values (e.g., `/bnb test 20 20 20`). |
-
-> **Note:** Go to `ESC -> Interface -> AddOns -> BreadAndBlood` to access the full settings panel.
+| `/bnb` | Opens the settings menu instructions. |
+| `/bnb test [hunger] [thirst] [fatigue]` | Instantly sets your stats to test UI penalty configurations (e.g., `/bnb test 20 20 20`). |
 
 ---
 
@@ -66,4 +54,6 @@ You can use the following commands in-game to manage or test the addon:
 2. Download the latest **`BreadAndBlood.zip`** file.
 3. Extract the ZIP file and place the `BreadAndBlood` folder directly into your WoW directory:  
    `World of Warcraft\Interface\AddOns\`
-4. Log into the game, and make sure the addon is enabled in your AddOns list.
+4. Log into the game, and make sure the addon is enabled in your AddOns list at the character selection screen.
+
+> **Survival Tip:** Survive the harsh environments of Azeroth, remember to pack your rations, and pitch a tent by the fire. Your life depends on it!
